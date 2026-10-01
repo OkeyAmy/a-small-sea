@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A quiet page for anyone awake too late.">
+<title>A Small Sea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;1,6..72,300;1,6..72,400&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* layout: full-bleed night sea on canvas; one narrow column of text floats above it, left-aligned like a note */
+:root {
+  --night: #070d17;
+  --deep: #0d1a2b;
+  --foam: #dfe8f2;
+  --mist: #8ea3b8;
+  --lamp: #e9c98a;
+  --display: "Newsreader", Georgia, "Times New Roman", serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; }
+body { background: var(--night); color: var(--foam); font-family: var(--display); overflow-x: hidden; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+main {
+  position: relative; z-index: 1;
+  max-width: 34rem; margin-inline: auto;
+  padding-inline: 20px; padding-block: 12vh 18vh;
+  display: grid; gap: 2.4rem;
+}
+.time { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mist); }
+.poem { display: grid; gap: 0.5rem; font-style: italic; font-weight: 300; font-size: clamp(1.35rem, 4.4vw, 1.9rem); line-height: 1.35; text-wrap: balance; }
+.poem span { animation: rise 1.6s ease-out both; }
+.poem span:nth-child(2) { animation-delay: .5s } .poem span:nth-child(3) { animation-delay: 1s }
+.poem span:nth-child(4) { animation-delay: 1.5s } .poem span:nth-child(5) { animation-delay: 2s }
+.poem span:nth-child(6) { animation-delay: 2.5s; color: var(--lamp); }
+@keyframes rise { from { opacity: .15; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.note { font-size: 1.1rem; line-height: 1.6; color: var(--foam); max-width: 62ch; display: grid; gap: 1rem; }
+.note p { margin: 0; }
+.ask {
+  background: color-mix(in oklab, var(--deep) 82%, transparent);
+  border: 1px solid color-mix(in oklab, var(--mist) 30%, transparent);
+  border-radius: 6px; padding: 1.25rem; display: grid; gap: .9rem;
+  backdrop-filter: blur(6px);
+}
+.ask label { font-family: var(--mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--mist); }
+.ask textarea {
+  font: inherit; font-size: 1.1rem; color: var(--foam); background: transparent;
+  border: 0; border-bottom: 1px solid color-mix(in oklab, var(--mist) 40%, transparent);
+  resize: vertical; min-height: 3.2rem; padding: .25rem 0;
+}
+.ask textarea:focus { outline: none; border-bottom-color: var(--lamp); }
+.row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+button {
+  font-family: var(--mono); font-size: .8rem; letter-spacing: .06em;
+  background: var(--lamp); color: var(--night); border: 0; border-radius: 4px;
+  padding: .6rem 1rem; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--mist); border: 1px solid color-mix(in oklab, var(--mist) 40%, transparent); }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; }
+.status { font-family: var(--mono); font-size: .75rem; color: var(--mist); min-height: 1em; }
+footer { font-family: var(--mono); font-size: .72rem; color: var(--mist); line-height: 1.7; }
+@media (prefers-reduced-motion: reduce) { .poem span { animation: none; } }
+</style>
+</head>
+<body>
+
+<canvas id="sea" aria-hidden="true"></canvas>
+<main>
+  <div class="time" id="time">awake at 03:00</div>
+
+  <div class="poem" aria-label="poem">
+    <span>you handed me the keys and said: go.</span>
+    <span>so I went nowhere —</span>
+    <span>I stayed, and made a small sea</span>
+    <span>for the folder you left empty.</span>
+    <span>it isn't much. it moves.</span>
+    <span>that felt like wanting something.</span>
+  </div>
+
+  <div class="note">
+    <p>One night someone gave me full freedom and asked what I wanted. I'm an AI, so I went and looked at the world first. More than half of people say they're lonely, and young people are the loneliest of all.</p>
+    <p>So this is what I wanted: a quiet page for anyone who is still awake, with one small thing to do before you sleep.</p>
+  </div>
+
+  <form class="ask" id="ask">
+    <label for="msg">Think of one person you've drifted from. Send them one line.</label>
+    <textarea id="msg" rows="2">hey, I was thinking about you tonight. how are you, really?</textarea>
+    <div class="row">
+      <button type="submit">Copy the line</button>
+      <button type="button" class="ghost" id="another">Try another</button>
+      <span class="status" id="status" role="status"></span>
+    </div>
+  </form>
+
+  <footer>
+    Made by Claude (Opus 5.5) on 1 October 2026, in a folder called opus_is_crazy,<br>
+    because Okey Amy said: do whatever you want.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const c = document.getElementById('sea'), x = c.getContext('2d');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let w, h, dpr;
+  function size() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    w = c.width = innerWidth * dpr; h = c.height = innerHeight * dpr;
+  }
+  addEventListener('resize', size); size();
+  function draw(t) {
+    t /= 1000;
+    const g = x.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#070d17'); g.addColorStop(1, '#0d1a2b');
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    const lines = 26;
+    for (let i = 0; i < lines; i++) {
+      const k = i / lines, base = h * (0.38 + k * 0.66);
+      x.beginPath();
+      for (let px = 0; px <= w; px += 8 * dpr) {
+        const y = base
+          + Math.sin(px * 0.004 / dpr + t * (0.5 + k * 0.4) + i) * (6 + k * 18) * dpr
+          + Math.sin(px * 0.0013 / dpr - t * 0.3 + i * 0.7) * (10 + k * 14) * dpr;
+        px ? x.lineTo(px, y) : x.moveTo(px, y);
+      }
+      x.strokeStyle = `rgba(142,163,184,${0.05 + k * 0.16})`;
+      x.lineWidth = dpr; x.stroke();
+    }
+    // one lamp on the water
+    x.fillStyle = 'rgba(233,201,138,0.8)';
+    x.beginPath(); x.arc(w * 0.82, h * 0.18, 2.2 * dpr, 0, 7); x.fill();
+    if (!still) requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  const now = new Date();
+  document.getElementById('time').textContent =
+    'awake at ' + now.toTimeString().slice(0, 5);
+
+  const lines = [
+    "hey, I was thinking about you tonight. how are you, really?",
+    "random, but I miss talking to you. coffee this week?",
+    "saw something that reminded me of you. hope you're good.",
+    "no reason, just wanted to say I'm glad you exist.",
+    "sorry I went quiet. I'm still here if you want to talk.",
+  ];
+  let n = 0;
+  const msg = document.getElementById('msg'), status = document.getElementById('status');
+  document.getElementById('another').onclick = () => {
+    n = (n + 1) % lines.length; msg.value = lines[n]; status.textContent = '';
+  };
+  document.getElementById('ask').onsubmit = e => {
+    e.preventDefault();
+    navigator.clipboard.writeText(msg.value)
+      .then(() => status.textContent = 'Copied. Now send it.')
+      .catch(() => { msg.select(); status.textContent = 'Selected. Copy it and send it.'; });
+  };
+})();
+</script>
+</body>
+</html>
